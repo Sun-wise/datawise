@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>DataWise 🧠</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #f7f9fc;
+      color: #333;
+      display: flex;
+      justify-content: center;
+      padding: 40px 20px;
+      margin: 0;
+    }
+    .container {
+      width: 100%;
+      max-width: 700px;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      padding: 30px;
+      text-align: center;
+    }
+    h1 {
+      margin: 0 0 16px 0;
+      color: #2c3e50;
+    }
+    p {
+      color: #666;
+      font-size: 16px;
+    }
+    .drop-area {
+      border: 3px dashed #3498db;
+      border-radius: 8px;
+      padding: 60px 20px;
+      margin: 20px 0;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    .drop-area:hover {
+      background: #f0f7ff;
+    }
+    .drop-area.highlight {
+      background: #e0f4ff;
+    }
+    button {
+      background: #3498db;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      font-size: 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      margin: 10px 5px;
+    }
+    button:disabled {
+      background: #95a5a6;
+      cursor: not-allowed;
+    }
+    button.secondary {
+      background: #2ecc71;
+    }
+    #status {
+      margin-top: 20px;
+      font-size: 14px;
+      color: #e74c3c;
+      min-height: 20px;
+    }
+    #insights-box {
+      display: none;
+      margin-top: 20px;
+      text-align: left;
+      background: #f8f9fa;
+      padding: 15px;
+      border-radius: 8px;
+      font-size: 15px;
+    }
+    #insights-box ul {
+      margin: 10px 0;
+      padding-left: 20px;
+    }
+    #download-buttons {
+      display: none;
+      margin-top: 20px;
+    }
+    .spinner {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #3498db;
+      border-radius: 50%;
+      width: 20px;
+      height: 20px;
+      animation: spin 1s linear infinite;
+      display: inline-block;
+      vertical-align: middle;
+      margin-left: 10px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>DataWise 🧠</h1>
+    <p>Upload your data. Get wise insights — instantly.</p>
+
+    <div class="drop-area" id="drop-area">
+      <p>Drag & drop your CSV or Excel file here</p>
+      <input type="file" id="file-input" hidden />
+    </div>
+
+    <button id="upload-button">Analyze Data</button>
+
+    <div id="status"></div>
+
+    <div id="insights-box">
+      <h3>📊 Top Insights</h3>
+      <ul id="insights-list"></ul>
+    </div>
+
+    <div id="download-buttons">
+      <button id="view-report" class="secondary">👁️ View Full Report</button>
+      <button id="download-html" class="secondary">📥 Download HTML Report</button>
+    </div>
+  </div>
+
+  <script>
+    const dropArea = document.getElementById("drop-area");
+    const fileInput = document.getElementById("file-input");
+    const uploadButton = document.getElementById("upload-button");
+    const status = document.getElementById("status");
+    const insightsBox = document.getElementById("insights-box");
+    const insightsList = document.getElementById("insights-list");
+    const downloadButtons = document.getElementById("download-buttons");
+    const viewReportBtn = document.getElementById("view-report");
+    const downloadHtmlBtn = document.getElementById("download-html");
+
+    // Open file picker
+    dropArea.addEventListener("click", () => fileInput.click());
+
+    // Highlight on drag
+    ["dragenter", "dragover"].forEach(event => {
+      dropArea.addEventListener(event, e => {
+        e.preventDefault();
+        dropArea.classList.add("highlight");
+      });
+    });
+
+    ["dragleave", "drop"].forEach(event => {
+      dropArea.addEventListener(event, () => dropArea.classList.remove("highlight"));
+    });
+
+    // Handle drop
+    dropArea.addEventListener("drop", e => {
+      e.preventDefault();
+      const files = e.dataTransfer.files;
+      if (files.length) {
+        fileInput.files = files;
+        status.textContent = `File: ${files[0].name}`;
+      }
+    });
+
+    fileInput.addEventListener("change", () => {
+      if (fileInput.files.length) {
+        status.textContent = `File: ${fileInput.files[0].name}`;
+      }
+    });
+
+    // Upload and analyze
+    uploadButton.addEventListener("click", async () => {
+      const file = fileInput.files[0];
+      if (!file) {
+        status.textContent = "Please select a file.";
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      status.innerHTML = "Uploading and analyzing... <div class='spinner'></div>";
+      uploadButton.disabled = true;
+      insightsBox.style.display = "none";
+      downloadButtons.style.display = "none";
+
+      try {
+        const response = await fetch("/upload", {
+          method: "POST",
+          body: formData
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+          status.textContent = `✅ Analyzed ${result.filename}`;
+          
+          // Show insights
+          insightsList.innerHTML = result.insights.map(i => `<li>${i}</li>`).join("");
+          insightsBox.style.display = "block";
+
+          // Show download buttons
+          downloadButtons.style.display = "block";
+
+          // Button actions
+          viewReportBtn.onclick = () => window.open("/report", "_blank");
+          downloadHtmlBtn.onclick = () => window.open("/download-html", "_blank");
+        } else {
+          status.textContent = `Error: ${result.error}`;
+        }
+      } catch (err) {
+        status.textContent = `Failed: ${err.message}`;
+      } finally {
+        uploadButton.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
